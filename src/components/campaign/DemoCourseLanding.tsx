@@ -2,8 +2,11 @@ import Image from 'next/image'
 
 import { RenderBlocks } from '@/components/blocks/RenderBlocks'
 import { MediaImage } from '@/components/content/MediaImage'
+import { CourseCta } from '@/components/courses/CourseCta'
 import { Button } from '@/components/ui/Button'
 import { Container } from '@/components/ui/Container'
+import { PriceTag } from '@/components/ui/PriceTag'
+import { coursePriceHuf, courseTitle, isPaidCourse } from '@/lib/courses'
 import { ctaLabel } from '@/lib/cta-vocabulary'
 import {
   DEMO_COURSE_EXCERPT,
@@ -11,12 +14,20 @@ import {
   DEMO_COURSE_TITLE,
   demoCourseLayout,
 } from '@/lib/demo-course-content'
-import type { Page } from '@/payload-types'
+import type { Page, Product } from '@/payload-types'
 
 import './demo-course.css'
 
 export interface DemoCourseLandingProps {
   page?: Page | null
+  /**
+   * A kampányoldalon árult kurzus. `null`, ha nincs beállítva vagy a
+   * lekérdezés hibázott — ilyenkor az oldal a korábbi, vásárlás nélküli
+   * alakjában jelenik meg, és kimondja, hogy most nem vásárolható.
+   */
+  course?: Product | null
+  /** A bejelentkezett vevőnek él-e a hozzáférése ehhez a kurzushoz. */
+  hasPurchased?: boolean
 }
 
 type Layout = NonNullable<Page['layout']>
@@ -82,9 +93,28 @@ function renderableLayout(layout: ReturnType<typeof demoCourseLayout>): Layout {
   })
 }
 
-export function DemoCourseLanding({ page }: DemoCourseLandingProps) {
-  const title = page?.title?.trim() || DEMO_COURSE_TITLE
-  const excerpt = page?.excerpt?.trim() || DEMO_COURSE_EXCERPT
+export function DemoCourseLanding({
+  page,
+  course = null,
+  hasPurchased = false,
+}: DemoCourseLandingProps) {
+  // Sorrend: a szerkesztő által írt CMS-szöveg nyer, utána a TERMÉK adata, és
+  // csak legvégül a beégetett alapérték. Így az adminban átírt kurzuscím és
+  // rövid leírás magától megjelenik itt is, külön szerkesztés nélkül.
+  const title = page?.title?.trim() || (course ? courseTitle(course) : '') || DEMO_COURSE_TITLE
+  const excerpt = page?.excerpt?.trim() || course?.shortDescription?.trim() || DEMO_COURSE_EXCERPT
+  // Vásárolható-e itt: érvényes árú, publikált kurzus kell hozzá. A hiányos
+  // konfigurációjú terméket a pénztár úgyis elutasítaná, ezért inkább nem
+  // mutatunk gombot (courses.ts isPaidCourse).
+  const purchasable = course !== null && course.status === 'published' && isPaidCourse(course)
+  // A CTA akkor is kell, ha a kurzus már a vevőé (akár archivált): neki a
+  // lejátszóra mutató gomb jár, nem a „nem vásárolható" mondat.
+  const showCta = course !== null && (purchasable || hasPurchased)
+  // Az árat csak a még NEM vevőnek mutatjuk; aki megvette, annak zaj lenne.
+  // A `course !== null` itt kiírva szerepel, hogy a szűkítés ne az aliasolt
+  // feltételtől függjön.
+  const priceHuf =
+    course !== null && purchasable && !hasPurchased ? coursePriceHuf(course) : null
   const heroMedia = page?.heroImage && typeof page.heroImage === 'object' ? page.heroImage : null
   const layout = demoCourseLayout(page)
   const blocks = renderableLayout(layout)
@@ -120,11 +150,29 @@ export function DemoCourseLanding({ page }: DemoCourseLandingProps) {
         <div className="kc-demo-hero__veil" aria-hidden="true" />
         <Container className="kc-demo-hero__inner">
           <div className="kc-demo-hero__copy">
-            <p className="kc-demo-hero__disclosure">Demókurzus, jelenleg nem vásárolható.</p>
+            {/* A „nem vásárolható" közlés CSAK akkor igaz, ha tényleg nincs
+                mögötte megvehető kurzus. Ha van, a mondat helyére a valódi ár
+                és a vásárlás gomb kerül — a felirat legyen igaz (SKILL.md 2.). */}
+            {showCta ? null : (
+              <p className="kc-demo-hero__disclosure">Demókurzus, jelenleg nem vásárolható.</p>
+            )}
             <h1 className="kc-demo-hero__title" id="demo-course-title">
               {title}
             </h1>
             <p className="kc-demo-hero__lead">{excerpt}</p>
+            {/* Az ár a GOMB MELLETT áll, nem az oldal alján: a „mibe kerül"
+                kérdésre a cselekvés közelében kell válasz (SKILL.md 2.).
+                A gombot a resolveCourseCta adja a CourseCta-n keresztül —
+                ugyanaz az állapotgép, mint a kurzusoldalon, a kosárban és a
+                pénztárban; második CTA-gépet nem írunk (ügynök-kézikönyv 5.7). */}
+            {showCta && course ? (
+              <div className="kc-demo-hero__buy">
+                {priceHuf !== null ? (
+                  <PriceTag className="kc-demo-hero__price" label="Ár:" priceHuf={priceHuf} />
+                ) : null}
+                <CourseCta hasPurchased={hasPurchased} product={course} />
+              </div>
+            ) : null}
             <div className="kc-demo-hero__actions">
               {hasVisibleModules ? (
                 <Button className="kc-demo-hero__cta" href="#modulok" variant="secondary">

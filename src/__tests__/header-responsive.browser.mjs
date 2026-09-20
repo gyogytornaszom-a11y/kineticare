@@ -73,13 +73,13 @@ const bundle = await build({
           } else if (args.path.endsWith('/menus')) {
             contents = `
             const item = (id, label, href, children = []) => ({id, label, href, children, isExternal: false, openInNewTab: false})
-            // Az „olcsó dolgok itt" az ÉLŐ Payload-menü extra gyereke
+            // Az „Akciós termékek" az ÉLŐ Payload-menü extra gyereke
             // (/akcios-kurzus), nem a seed terve. A fixture szándékosan
             // megtartja, hogy a túlcsordulás/fiók extra CMS-ponttal is mérhető.
             export const getNavTree = async () => window.fixtureEmptyMenu ? [] : [
               item(1, 'Szolgáltatások', '/szolgaltatasok', [
                 item(4, 'Rendelői kezelések', '/kezelesek'), item(5, 'Szakmai képzés', '/szakmai-kepzesek'),
-                item(6, 'SOS KézRelax', '/kurzusok/sos'), item(8, 'olcsó dolgok itt', '/akcios-kurzus')
+                item(6, 'SOS KézRelax', '/kurzusok/sos'), item(8, 'Akciós termékek', '/akcios-kurzus')
               ]),
               item(2, 'Rólunk', '/rolunk'), item(7, 'Tudástár', '/blog'), item(3, 'Kapcsolat', '/kapcsolat')
             ]`
@@ -251,7 +251,7 @@ try {
         // első ALMENÜS menüpont fókusza nyitja.
         await page.locator(SUBMENU_ITEM_LINK).first().focus()
       }
-      const campaign = nav.getByRole('link', { name: 'olcsó dolgok itt', exact: true })
+      const campaign = nav.getByRole('link', { name: 'Akciós termékek', exact: true })
       await campaign.waitFor({ state: 'visible' })
       assert.equal(await campaign.getAttribute('href'), '/akcios-kurzus')
       assert.equal(await campaign.getAttribute('aria-current'), 'page')
@@ -391,7 +391,7 @@ try {
     await page.locator('.kc-nav-mobile > button').click()
     const campaign = page
       .locator('.kc-nav-mobile__drawer')
-      .getByRole('link', { name: 'olcsó dolgok itt', exact: true })
+      .getByRole('link', { name: 'Akciós termékek', exact: true })
     await campaign.focus()
     await campaign.scrollIntoViewIfNeeded()
     const box = await campaign.boundingBox()

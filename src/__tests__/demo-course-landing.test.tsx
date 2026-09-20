@@ -11,11 +11,38 @@ import {
   DEMO_COURSE_TITLE,
   demoCourseLayout,
 } from '../lib/demo-course-content'
+import { formatPriceHuf } from '../lib/format-price'
 import { logger } from '../lib/logger'
-import type { Page } from '../payload-types'
+import type { Page, Product } from '../payload-types'
 
 function render(page?: Page | null): string {
   return renderToStaticMarkup(createElement(DemoCourseLanding, { page }))
+}
+
+/** A kampányoldalon árult kurzus minimális, érvényes alakja. */
+function courseFixture(overrides: Partial<Product> = {}): Product {
+  return {
+    id: 4242,
+    title: 'Otthoni kézrehab program akció',
+    // A courseTitle a displayTitle-t nézi először, utána a sku-t — a `title`
+    // mezőt NEM használja (courses.ts courseTitle).
+    displayTitle: 'Otthoni kézrehab program akció',
+    sku: 'otthoni-kezrehab-akcio',
+    slug: 'otthoni-kezrehab-program-akcio',
+    shortDescription: 'Az otthoni program akciós ára.',
+    status: 'published',
+    priceInHUF: 39500,
+    priceInHUFEnabled: true,
+    updatedAt: '2026-09-20T12:00:00.000Z',
+    createdAt: '2026-09-20T12:00:00.000Z',
+    ...overrides,
+  } as Product
+}
+
+function renderWithCourse(course: Product | null, hasPurchased = false): string {
+  return renderToStaticMarkup(
+    createElement(DemoCourseLanding, { page: null, course, hasPurchased }),
+  )
 }
 
 function pageFixture(overrides: Partial<Page> = {}): Page {
@@ -53,6 +80,41 @@ describe('DemoCourseLanding', () => {
     expect(html).toContain('Gyakori kérdések')
     expect(html).not.toMatch(/\bFt\b|kosárba teszem|tovább a pénztárhoz|75 perc|100 perc/i)
     expect(html).not.toContain('"@type":"FAQPage"')
+  })
+
+  it('megvásárolható kurzussal a demó-közlés eltűnik, és valódi ár + CTA jelenik meg', () => {
+    const html = renderWithCourse(courseFixture())
+
+    // A „nem vásárolható" mondat hazugság lenne a vásárlás gomb mellett.
+    expect(html).not.toContain('Demókurzus, jelenleg nem vásárolható.')
+    // Az ár a gomb mellett, a §3.2 #1 felirattal és a kanonikus pénztár-úttal.
+    // A formázott alakot a formatPriceHuf adja (nem törhető szóközökkel), ezért
+    // azzal hasonlítunk, nem kézzel írt szóközös sztringgel.
+    expect(html).toContain(formatPriceHuf(39500))
+    expect(html).toContain('Megveszem a kurzust')
+    expect(html).toContain('/penztar?termek=4242')
+    // A kurzus címe és rövid leírása a TERMÉKBŐL jön, ha nincs CMS-oldal.
+    expect(html).toContain('Otthoni kézrehab program akció')
+    expect(html).toContain('Az otthoni program akciós ára.')
+  })
+
+  it('már megvett kurzusnál a lejátszóra visz, nem a pénztárba', () => {
+    const html = renderWithCourse(courseFixture(), true)
+
+    expect(html).toContain('Kezdd el a kurzust')
+    expect(html).toContain('/kurzusaim/4242')
+    expect(html).not.toContain('/penztar?termek=4242')
+  })
+
+  it('nem publikált vagy ár nélküli kurzusnál nincs vásárlás, marad a demó-közlés', () => {
+    const piszkozat = renderWithCourse(courseFixture({ status: 'draft' }))
+    expect(piszkozat).toContain('Demókurzus, jelenleg nem vásárolható.')
+    expect(piszkozat).not.toContain('Megveszem a kurzust')
+
+    // Ár-pipa BE, összeg ÜRES: hiányos konfiguráció, nem ingyenes (courses.ts).
+    const arNelkul = renderWithCourse(courseFixture({ priceInHUF: null }))
+    expect(arNelkul).toContain('Demókurzus, jelenleg nem vásárolható.')
+    expect(arNelkul).not.toContain('Megveszem a kurzust')
   })
 
   it('a CMS hero-adatát és teljes, szerkesztői sorrendjét használja', () => {
