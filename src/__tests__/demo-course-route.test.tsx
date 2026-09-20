@@ -4,10 +4,21 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 const mocks = vi.hoisted(() => ({
   page: vi.fn(),
   draft: vi.fn(),
+  course: vi.fn(),
+  viewer: vi.fn(),
+  access: vi.fn(),
+  headers: vi.fn(),
 }))
 
 vi.mock('@/lib/cms', () => ({ getPageBySlug: mocks.page }))
-vi.mock('next/headers', () => ({ draftMode: mocks.draft }))
+vi.mock('next/headers', () => ({ draftMode: mocks.draft, headers: mocks.headers }))
+// A termék-lekérdezés a lib-ben él, hogy a route vékony és mockolható legyen:
+// így a route-teszt nem nyúl valódi Payload-példányhoz.
+vi.mock('@/lib/campaign-course', () => ({
+  getCampaignCourse: mocks.course,
+  getCampaignViewer: mocks.viewer,
+  hasLiveCampaignAccess: mocks.access,
+}))
 vi.mock('@/components/campaign/DemoCourseLanding', () => ({
   DemoCourseLanding: ({ page }: { page: { title: string } | null }) => (
     <div>{page?.title ?? 'Demo fallback'}</div>
@@ -23,6 +34,10 @@ beforeEach(() => {
   vi.clearAllMocks()
   mocks.page.mockResolvedValue(null)
   mocks.draft.mockResolvedValue({ isEnabled: false })
+  mocks.course.mockResolvedValue(null)
+  mocks.viewer.mockResolvedValue(null)
+  mocks.access.mockResolvedValue(false)
+  mocks.headers.mockResolvedValue(new Headers())
 })
 
 describe('demo campaign route', () => {
@@ -71,5 +86,29 @@ describe('demo campaign route', () => {
     const metadata = await generateMetadata()
     expect(metadata.title).toBe('Képzeletbeli akciós kurzus')
     expect(metadata.description).toContain('bemutatóoldalát')
+  })
+
+  it('CMS-oldal nélkül a KURZUS címét és leírását használja a metaadatban', async () => {
+    mocks.course.mockResolvedValue({
+      id: 4242,
+      // A courseTitle a displayTitle-t nézi, nem a `title` mezőt.
+      displayTitle: 'Otthoni kézrehab program akció',
+      sku: 'otthoni-kezrehab-akcio',
+      shortDescription: 'Az otthoni program akciós ára.',
+      status: 'published',
+      priceInHUF: 39500,
+      priceInHUFEnabled: true,
+    })
+
+    const metadata = await generateMetadata()
+    expect(metadata.title).toBe('Otthoni kézrehab program akció')
+    expect(metadata.description).toBe('Az otthoni program akciós ára.')
+    // A noindex a termék meglététől FÜGGETLENÜL marad: a kanonikus
+    // kurzusoldallal nem versenyzünk a találati listában.
+    expect(metadata.robots).toEqual({
+      index: false,
+      follow: true,
+      googleBot: { index: false, follow: true },
+    })
   })
 })

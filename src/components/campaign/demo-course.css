@@ -84,6 +84,35 @@
   line-height: var(--kc-leading-body);
 }
 
+/*
+ * Vásárlási blokk a sötét hero-ban: ár + elsődleges gomb egy sorban.
+ * Az ár a gomb MELLETT áll, hogy a „mibe kerül" kérdésre a cselekvés
+ * közelében legyen válasz (.claude/skills/termektervezes/SKILL.md 2.).
+ * Betűméretet szándékosan nem állítunk: a három tipográfiai tokenen kívüli
+ * font-size-t az őr tiltja (src/__tests__/tipografia-harom-meret.test.ts).
+ */
+.kc-demo-hero__buy {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--kc-space-3);
+  margin-top: var(--kc-space-5);
+}
+
+/* A sötét hero-n a világos szövegszín adja a kontrasztot (a --kc-color-text
+   sötétkéken olvashatatlan lenne). */
+.kc-demo-hero__price {
+  color: var(--kc-color-on-dark);
+}
+
+.kc-demo-hero__buy .kc-course-cta {
+  margin: 0;
+}
+
+.kc-demo-hero__buy .kc-course-cta__note {
+  color: var(--kc-color-on-dark);
+}
+
 .kc-demo-hero__actions {
   display: flex;
   flex-wrap: wrap;
